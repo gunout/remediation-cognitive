@@ -58,7 +58,6 @@
         }
         @keyframes scan { 0% { top: -10%; } 100% { top: 110%; } }
 
-        /* Layout */
         .hud-container {
             height: 100vh;
             display: grid;
@@ -158,7 +157,7 @@
 
         .stimulus-huge { font-size: 5rem; font-weight: 900; font-family: 'Orbitron'; text-align: center; margin: 1rem 0; letter-spacing: 6px; }
         .options-row { display: flex; gap: 1.2rem; justify-content: center; margin-top: 1.5rem; flex-wrap: wrap; }
-        .react-box { width: 100%; height: 260px; background: rgba(20,30,45,0.8); border: 2px solid var(--text-muted); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.08s linear; font-size: 1.8rem; }
+        .react-box { width: 100%; height: 260px; background: rgba(20,30,45,0.8); border: 2px solid var(--text-muted); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.08s linear; font-size: 1.8rem; flex-direction: column; gap: 1rem; }
         .corsi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; width: 280px; margin: 1rem auto; }
         .corsi-block { width: 80px; height: 80px; background: rgba(255,255,255,0.05); border: 1px solid rgba(0,243,255,0.5); transition: 0.1s; cursor: pointer; border-radius: 4px; }
         .corsi-block.active { background: var(--primary); box-shadow: 0 0 20px var(--primary); border-color: white; transform: scale(0.96); }
@@ -174,6 +173,17 @@
         #tmtCanvas { background: #07121c; border-radius: 6px; cursor: crosshair; margin-top: 0.5rem; box-shadow: 0 0 0 1px rgba(0,243,255,0.2);}
         canvas { display: block; margin: 0 auto; max-width: 100%; height: auto; }
         .flex-center { display: flex; justify-content: center; align-items: center; flex-direction: column; }
+        
+        .toast {
+            position: fixed; bottom: 20px; right: 20px; background: var(--bg-panel);
+            border-left: 4px solid var(--primary); padding: 12px 20px;
+            font-family: 'Orbitron'; z-index: 2000; animation: slideIn 0.3s ease;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -235,13 +245,22 @@
         }
     }
 
-    // Scoring algorithms
+    function showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.style.borderLeftColor = type === 'error' ? 'var(--warning)' : 'var(--success)';
+        toast.innerHTML = `<i class="fas ${type === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle'}"></i> ${message}`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
     const norm = {
         rtScore: (ms) => Math.min(19, Math.max(1, Math.round(18 - (ms / 45)))),
         accScore: (pct) => Math.min(19, Math.max(1, Math.round((pct / 5.2) - 1.5))),
         spanScore: (maxLen) => Math.min(19, Math.max(1, 4 + (maxLen * 1.2))),
         tmtScore: (sec) => Math.min(19, Math.max(1, Math.round(19 - (sec / 4.8))))
     };
+    
     const interpret = (ss) => {
         if(ss >= 14) return {txt:"EXCEPTIONNEL", clr:"var(--success)"};
         if(ss >= 9) return {txt:"NORMATIF", clr:"var(--primary)"};
@@ -257,10 +276,11 @@
         scoreDiv.className = `score-ss ${score >= 9 ? 'success' : 'danger'}`;
         document.getElementById('resDetails').innerHTML = `${details}<br><span style="color:${inter.clr}">${inter.txt}</span>`;
         document.getElementById('resultModal').classList.add('show');
+        showToast(`Test ${testKey.toUpperCase()} terminé - Score: ${score}`, 'info');
     }
+    
     function closeModal() { document.getElementById('resultModal').classList.remove('show'); }
 
-    // Helper for dynamic loading
     function loadTest(testId) {
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
         if(event && event.currentTarget) event.currentTarget.classList.add('active');
@@ -269,7 +289,7 @@
     }
 
     // --------------------------------------------------------------
-    // INTRO / HOME
+    // INTRO
     // --------------------------------------------------------------
     window.init_intro = () => {
         document.getElementById('stage').innerHTML = `
@@ -278,14 +298,13 @@
             <div class="hud-corner c-bl"></div><div class="hud-corner c-br"></div>
             <i class="fas fa-head-side-vr" style="font-size: 4rem; color: var(--primary); margin-bottom: 1rem;"></i>
             <h2>BATTERIE NEUROPSYCHOLOGIQUE</h2>
-            <p style="max-width: 550px; margin: 1rem auto;">Tests validés : Trail Making (A/B), Stroop, Go/No-Go, Empan numérique, Corsi.</p>
+            <p style="max-width: 550px; margin: 1rem auto;">Tests : Trail Making (A/B), Stroop, Go/No-Go, Empan numérique, Corsi.</p>
             <button class="btn" style="font-size:1.1rem; padding: 0.8rem 2.5rem;" onclick="startGlobalTimer(); loadTest('tmt_a');">DÉMARRER L'ÉVALUATION</button>
-            <p style="margin-top: 1.2rem; font-size:0.7rem;">Cliquez sur INITIALISER pour lancer la session chronométrée</p>
         </div>`;
     };
 
     // --------------------------------------------------------------
-    // TRAIL MAKING (Générique)
+    // TRAIL MAKING
     // --------------------------------------------------------------
     function buildTMT(seqArray, partName) {
         const w = 700, h = 420;
@@ -386,66 +405,172 @@
     };
 
     // --------------------------------------------------------------
-    // GO/NO-GO
+    // GO/NO-GO CORRIGÉ
     // --------------------------------------------------------------
-    let gng = { totalTrials:0, correctResp:0, errors:0, active:false, mode:null, timeoutId:null, listening:false };
+    let gng = {
+        totalTrials: 0, correctGo: 0, correctNoGo: 0,
+        totalGo: 0, totalNoGo: 0, active: false, mode: null,
+        timeoutId: null, started: false, testEnded: false,
+        keyHandler: null, clickHandler: null
+    };
+
     window.init_gonogo = () => {
         if(gng.timeoutId) clearTimeout(gng.timeoutId);
-        gng = { totalTrials:0, correctResp:0, errors:0, active:false, mode:null, timeoutId:null, listening:false };
+        if(gng.keyHandler) document.removeEventListener('keydown', gng.keyHandler);
+        
+        gng = {
+            totalTrials: 0, correctGo: 0, correctNoGo: 0,
+            totalGo: 0, totalNoGo: 0, active: false, mode: null,
+            timeoutId: null, started: false, testEnded: false,
+            keyHandler: null, clickHandler: null
+        };
+        
         document.getElementById('stage').innerHTML = `
         <div class="hud-card">
             <div class="hud-corner c-tl"></div><div class="hud-corner c-tr"></div>
-            <div class="card-header"><div class="card-title">INHIBITION GO/NO-GO</div></div>
-            <div class="flex-center"><div id="gngBox" class="react-box" style="height:220px;">Cliquez pour démarrer</div></div>
-            <p style="text-align:center; margin-top:1rem;">✅ VERT = Appuyez (Espace ou clic) | ❌ ROUGE = Ne rien faire</p>
+            <div class="card-header"><div class="card-title">TEST D'INHIBITION [GO/NO-GO]</div><div class="card-subtitle">20 essais - Appuyez sur ESPACE pour GO</div></div>
+            <div class="flex-center" style="min-height: 400px;">
+                <div id="gngBox" class="react-box" style="height: 280px;"><i class="fas fa-hand-peace" style="font-size: 3rem;"></i><span>🔘 PRÊT 🔘</span></div>
+                <div style="margin-top: 1.5rem;"><button class="btn" id="gngStartBtn">▶ DÉMARRER</button></div>
+                <div id="gngProgress" style="margin-top: 1rem; font-family: 'Orbitron';"></div>
+            </div>
         </div>`;
-        const box = document.getElementById('gngBox');
-        const handler = (e) => {
-            if(e.type === 'keydown' && e.code !== 'Space') return;
-            if(!gng.active) { if(!gng.listening) startGNG(); return; }
-            if(gng.active && gng.mode === 'go') { gng.correctResp++; gng.active=false; box.style.background = "#1a2a3a"; box.innerText = "BON!"; setTimeout(()=>box.innerText="",200); }
-            else if(gng.active && gng.mode === 'nogo') { gng.errors++; gng.active=false; box.style.background = "#330f1f"; box.innerText = "ERREUR"; setTimeout(()=>box.innerText="",300); }
-            if(gng.active) gng.active = false;
-        };
-        window.removeGNGListener = () => { document.removeEventListener('keydown', handler); };
-        document.addEventListener('keydown', handler);
-        box.onclick = handler;
-        gng.listening = true;
+        
+        document.getElementById('gngStartBtn').onclick = () => startGNGTest();
     };
-    async function startGNG() {
-        gng.totalTrials = 0; gng.correctResp = 0; gng.errors = 0; gng.active = false;
-        await runGNGTrial();
+
+    async function startGNGTest() {
+        if(gng.started) return;
+        gng.started = true;
+        gng.testEnded = false;
+        
+        document.getElementById('gngStartBtn').style.display = 'none';
+        
+        gng.keyHandler = (e) => {
+            if(e.code === 'Space') {
+                e.preventDefault();
+                if(!gng.testEnded) handleGNGResponse();
+            }
+        };
+        document.addEventListener('keydown', gng.keyHandler);
+        
+        const box = document.getElementById('gngBox');
+        gng.clickHandler = () => { if(!gng.testEnded) handleGNGResponse(); };
+        box.onclick = gng.clickHandler;
+        
+        await runGNGSequence();
     }
-    async function runGNGTrial() {
-        if(gng.totalTrials >= 20) {
-            const totalGoTrials = 14; // 70% go approx, but compute precisely: based on actual attempts
-            const accuracy = (gng.correctResp / Math.max(1, gng.correctResp+gng.errors)) * 100;
-            const finalScore = norm.accScore(accuracy);
-            showResult(finalScore, `Précision inhibition: ${Math.round(accuracy)}%`, "gonogo");
-            if(window.removeGNGListener) window.removeGNGListener();
+
+    function handleGNGResponse() {
+        if(gng.testEnded || !gng.active) {
+            if(!gng.active && !gng.testEnded) showGNGFeedback("⏱️ ATTENDEZ LE SIGNAL", "var(--warning)");
             return;
         }
-        await new Promise(r => setTimeout(r, 700 + Math.random()*1200));
+        
+        if(gng.mode === 'go') {
+            gng.correctGo++;
+            showGNGFeedback("✓ BONNE RÉPONSE !", "var(--success)");
+            gng.active = false;
+            if(gng.timeoutId) clearTimeout(gng.timeoutId);
+            setTimeout(() => runGNGSequence(), 300);
+        } 
+        else if(gng.mode === 'nogo') {
+            showGNGFeedback("✗ ERREUR (Ne pas répondre au ROUGE)", "var(--warning)");
+            gng.active = false;
+            if(gng.timeoutId) clearTimeout(gng.timeoutId);
+            setTimeout(() => runGNGSequence(), 800);
+        }
+    }
+
+    function showGNGFeedback(message, color) {
+        const box = document.getElementById('gngBox');
+        if(!box) return;
+        const originalHTML = box.innerHTML;
+        box.style.background = color;
+        box.innerHTML = `<span style="font-size: 1.2rem;">${message}</span>`;
+        setTimeout(() => {
+            if(box && !gng.active && !gng.testEnded) {
+                box.style.background = "rgba(20,30,45,0.8)";
+                box.innerHTML = originalHTML;
+            }
+        }, 500);
+    }
+
+    async function runGNGSequence() {
+        if(gng.testEnded) return;
+        if(gng.totalTrials >= 20) { finishGNGTest(); return; }
+        
+        const delay = 800 + Math.random() * 1400;
+        await new Promise(r => setTimeout(r, delay));
+        if(gng.testEnded) return;
+        
         const isGo = Math.random() < 0.7;
         gng.mode = isGo ? 'go' : 'nogo';
         gng.active = true;
+        gng.totalTrials++;
+        if(isGo) gng.totalGo++;
+        else gng.totalNoGo++;
+        
         const box = document.getElementById('gngBox');
-        if(!box) return;
-        box.style.background = isGo ? "#05ffa1" : "#ff2a6d";
-        box.innerText = isGo ? "CLIQUEZ / ESPACE" : "ATTENDEZ";
-        setTimeout(() => {
-            if(gng.active) {
-                if(gng.mode === 'go') gng.errors++;
+        if(isGo) {
+            box.style.background = "var(--success)";
+            box.style.boxShadow = "0 0 40px var(--success)";
+            box.innerHTML = `<i class="fas fa-arrow-up" style="font-size: 3rem;"></i><span style="font-size: 1.8rem;">GO !</span><span style="font-size: 0.8rem;">Appuyez sur ESPACE</span>`;
+        } else {
+            box.style.background = "var(--warning)";
+            box.style.boxShadow = "0 0 40px var(--warning)";
+            box.innerHTML = `<i class="fas fa-ban" style="font-size: 3rem;"></i><span style="font-size: 1.8rem;">NO-GO</span><span style="font-size: 0.8rem;">N'APPUYEZ PAS</span>`;
+        }
+        
+        const prog = document.getElementById('gngProgress');
+        if(prog) prog.innerHTML = `Essais: ${gng.totalTrials}/20 | GO: ${gng.correctGo}/${gng.totalGo} | NO-GO: ${gng.correctNoGo}/${gng.totalNoGo}`;
+        
+        gng.timeoutId = setTimeout(() => {
+            if(gng.active && !gng.testEnded) {
+                if(gng.mode === 'go') showGNGFeedback("⚠️ MANQUÉ", "var(--warning)");
+                else { gng.correctNoGo++; showGNGFeedback("✓ BONNE ABSTENTION", "var(--success)"); }
                 gng.active = false;
-                box.style.background = "#1e2a36";
-                box.innerText = "";
-                gng.totalTrials++;
-                runGNGTrial();
-            } else {
-                gng.totalTrials++;
-                runGNGTrial();
+                runGNGSequence();
             }
-        }, 1100);
+        }, 1200);
+    }
+
+    function finishGNGTest() {
+        if(gng.testEnded) return;
+        gng.testEnded = true;
+        if(gng.keyHandler) document.removeEventListener('keydown', gng.keyHandler);
+        if(gng.timeoutId) clearTimeout(gng.timeoutId);
+        
+        const totalAccuracy = ((gng.correctGo + gng.correctNoGo) / 20) * 100;
+        let standardScore = 0;
+        if(totalAccuracy >= 95) standardScore = 18;
+        else if(totalAccuracy >= 90) standardScore = 16;
+        else if(totalAccuracy >= 85) standardScore = 14;
+        else if(totalAccuracy >= 80) standardScore = 12;
+        else if(totalAccuracy >= 75) standardScore = 10;
+        else if(totalAccuracy >= 70) standardScore = 8;
+        else if(totalAccuracy >= 65) standardScore = 6;
+        else if(totalAccuracy >= 60) standardScore = 4;
+        else standardScore = 2;
+        
+        const inhibitionErrors = gng.totalNoGo - gng.correctNoGo;
+        let finalScore = standardScore - inhibitionErrors;
+        finalScore = Math.max(1, Math.min(19, finalScore));
+        
+        const details = `Précision GO: ${Math.round((gng.correctGo/gng.totalGo)*100)}% (${gng.correctGo}/${gng.totalGo})<br>
+                        Précision NO-GO: ${Math.round((gng.correctNoGo/gng.totalNoGo)*100)}% (${gng.correctNoGo}/${gng.totalNoGo})<br>
+                        Précision totale: ${Math.round(totalAccuracy)}%<br>
+                        Erreurs d'inhibition: ${inhibitionErrors}`;
+        
+        showResult(finalScore, details, 'gonogo');
+        
+        const box = document.getElementById('gngBox');
+        if(box) {
+            box.style.background = "rgba(20,30,45,0.8)";
+            box.style.cursor = "default";
+            box.onclick = null;
+            box.innerHTML = `<i class="fas fa-check-circle" style="font-size: 3rem; color: var(--success);"></i><span>TEST TERMINÉ</span>`;
+        }
     }
 
     // --------------------------------------------------------------
@@ -502,7 +627,7 @@
                     renderDigitSpan();
                 } else finishDigitSpan();
             } else {
-                alert("Séquence incorrecte, réessayez même niveau.");
+                showToast("Séquence incorrecte, réessayez", "error");
                 renderDigitSpan();
             }
         }
@@ -514,18 +639,18 @@
     }
 
     // --------------------------------------------------------------
-    // CORSI BLOCKS
+    // CORSI
     // --------------------------------------------------------------
-    let corsi = { level:2, seq:[], userIdx:0, awaiting:false };
+    let corsi = { level:2, seq:[], userIdx:0 };
     window.init_corsi = () => {
-        corsi = { level:2, seq:[], userIdx:0, awaiting:false };
+        corsi = { level:2, seq:[], userIdx:0 };
         renderCorsi();
     };
     function renderCorsi() {
         document.getElementById('stage').innerHTML = `
         <div class="hud-card">
             <div class="hud-corner c-tl"></div><div class="hud-corner c-tr"></div>
-            <div class="card-header"><div class="card-title">CORSI BLOCKS (Visuo-spatial)</div><div class="card-subtitle">Niveau ${corsi.level}</div></div>
+            <div class="card-header"><div class="card-title">CORSI BLOCKS</div><div class="card-subtitle">Niveau ${corsi.level}</div></div>
             <div class="flex-center"><div class="corsi-grid" id="corsiGridDynamic">${Array(9).fill(0).map((_,i)=>`<div class="corsi-block" data-idx="${i}" id="corsiBlk${i}"></div>`).join('')}</div>
             <button class="btn" id="corsiStartBtn" onclick="playCorsiSequence()">JOUER SÉQUENCE</button></div>
         </div>`;
@@ -544,23 +669,25 @@
         }
         corsi.userIdx = 0;
         for(let i=0;i<9;i++) document.getElementById(`corsiBlk${i}`).style.pointerEvents = "auto";
-        window.corsiClickHandler = (ev) => {
-            const blkId = parseInt(ev.currentTarget.getAttribute('data-idx'));
-            ev.currentTarget.classList.add('active');
-            setTimeout(()=>ev.currentTarget.classList.remove('active'),150);
-            if(corsi.seq[corsi.userIdx] !== blkId) {
-                const finalScore = norm.spanScore(corsi.level-1);
-                showResult(finalScore, `Empan visuel: ${corsi.level-1}`, "corsi");
-                return;
-            }
-            corsi.userIdx++;
-            if(corsi.userIdx === corsi.seq.length) {
-                corsi.level++;
-                for(let i=0;i<9;i++) document.getElementById(`corsiBlk${i}`).style.pointerEvents = "none";
-                renderCorsi();
-            }
-        };
-        for(let i=0;i<9;i++) document.getElementById(`corsiBlk${i}`).onclick = window.corsiClickHandler;
+        
+        for(let i=0;i<9;i++) {
+            document.getElementById(`corsiBlk${i}`).onclick = (ev) => {
+                const blkId = parseInt(ev.currentTarget.getAttribute('data-idx'));
+                ev.currentTarget.classList.add('active');
+                setTimeout(()=>ev.currentTarget.classList.remove('active'),150);
+                if(corsi.seq[corsi.userIdx] !== blkId) {
+                    const finalScore = norm.spanScore(corsi.level-1);
+                    showResult(finalScore, `Empan visuel: ${corsi.level-1}`, "corsi");
+                    return;
+                }
+                corsi.userIdx++;
+                if(corsi.userIdx === corsi.seq.length) {
+                    corsi.level++;
+                    for(let i=0;i<9;i++) document.getElementById(`corsiBlk${i}`).style.pointerEvents = "none";
+                    renderCorsi();
+                }
+            };
+        }
     };
 
     // --------------------------------------------------------------
@@ -585,7 +712,6 @@
         document.getElementById('reportDetails').innerHTML = html;
     };
 
-    // Load intro by default
     window.init_intro();
 </script>
 </body>
