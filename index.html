@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>CLINICAL SUITE v6.4 | Batterie Étendue</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: #080c12;
+            --surface: #111820;
+            --border: #232f3e;
+            --primary: #3b82f6;
+            --accent: #06b6d4;
+            --danger: #ef4444;
+            --success: #10b981;
+            --text: #cbd5e1;
+            --muted: #64748b;
+        }
+        body { margin: 0; font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        /* TOP BAR */
+        .top-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 1.5rem; height: 50px; display: flex; align-items: center; justify-content: space-between; z-index: 10; }
+        .logo { font-weight: 700; letter-spacing: 1px; font-size: 0.85rem; color: #fff; display: flex; align-items: center; gap: 8px; }
+        
+        /* MAIN LAYOUT */
+        .app-layout { display: grid; grid-template-columns: 220px 1fr; flex: 1; overflow: hidden; }
+        
+        /* SIDEBAR */
+        .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 1rem; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+        .nav-title { font-size: 0.65rem; text-transform: uppercase; color: var(--muted); margin-top: 1rem; margin-bottom: 0.5rem; letter-spacing: 1px; }
+        .nav-btn { background: none; border: none; color: var(--text); padding: 0.7rem; border-radius: 6px; cursor: pointer; text-align: left; font-size: 0.85rem; display: flex; align-items: center; gap: 10px; transition: 0.15s; border: 1px solid transparent; }
+        .nav-btn:hover { background: rgba(255,255,255,0.03); }
+        .nav-btn.active { background: rgba(59, 130, 246, 0.1); border-color: rgba(59,130,246,0.5); color: #fff; }
+        .nav-btn i { width: 16px; text-align: center; color: var(--muted); }
+        .nav-btn.active i { color: var(--primary); }
+
+        /* MAIN CONTENT */
+        .main-content { display: flex; flex-direction: column; background: radial-gradient(circle at top, #131c27, #080c12); position: relative; }
+        .test-stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; overflow-y: auto; }
+        
+        /* COMPONENTS */
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 900px; box-shadow: 0 20px 50px rgba(0,0,0,0.4); }
+        .card-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .card-title { font-weight: 600; font-size: 1rem; color: #fff; }
+        .card-body { padding: 2rem; display: flex; flex-direction: column; align-items: center; min-height: 400px; justify-content: center; }
+
+        .btn { padding: 0.6rem 1.5rem; border-radius: 6px; font-weight: 500; cursor: pointer; border: none; font-family: inherit; font-size: 0.9rem; transition: 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { filter: brightness(1.1); }
+        .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        
+        /* SPECIFIC TEST WIDGETS */
+        .stimulus-huge { font-size: 5rem; font-weight: 700; font-family: 'IBM Plex Mono', monospace; margin: 1rem 0; }
+        .stimulus-color { font-size: 4rem; font-weight: 800; margin: 1rem 0; text-transform: uppercase; }
+        
+        /* TMT Canvas */
+        #tmtCanvas { background: #0f1724; border-radius: 8px; border: 1px solid var(--border); cursor: crosshair; touch-action: none; }
+        
+        /* Corsi Grid */
+        .corsi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; width: 270px; }
+        .corsi-block { width: 80px; height: 80px; background: #1e293b; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: 0.1s; }
+        .corsi-block.active { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 15px rgba(59,130,246,0.5); }
+        .corsi-block:hover { transform: scale(1.05); }
+
+        /* Go/No-Go */
+        .gng-box { width: 300px; height: 300px; background: #1e293b; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 1rem 0; transition: background 0.1s; }
+        .gng-box.go { background: var(--success); }
+        .gng-box.nogo { background: var(--danger); }
+
+        /* RESULTS MODAL */
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; z-index:100; opacity:0; pointer-events:none; transition:0.2s; }
+        .modal-overlay.show { opacity:1; pointer-events:all; }
+        .result-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; text-align: center; max-width: 400px; }
+        .score-ss { font-size: 4rem; font-weight: 700; color: var(--primary); line-height: 1; }
+        .score-label { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .score-interpretation { margin-top: 1rem; padding: 0.8rem; background: rgba(255,255,255,0.03); border-radius: 8px; font-size: 0.85rem; color: #fff; }
+
+        /* Report Chart */
+        #reportChart { max-height: 300px; }
+    </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="top-bar">
+    <div class="logo"><i class="fas fa-neuro-cortex"></i> NEURO-SUITE PRO</div>
+    <div style="font-size:0.8rem; color:var(--muted);">Session Patient: <span style="color:#fff">M. X (45a)</span> | Chrono: <span id="globalTimer">00:00</span></div>
+    <button class="btn btn-ghost" style="padding:5px 10px; font-size:0.8rem;" onclick="showFinalReport()"><i class="fas fa-file-medical"></i> Rapport Final</button>
+</div>
+
+<div class="app-layout">
+    <!-- SIDEBAR NAV -->
+    <nav class="sidebar">
+        <div class="nav-title">Batterie Initiale</div>
+        <button class="nav-btn active" onclick="loadTest('intro')"><i class="fas fa-home"></i> Consignes</button>
+        
+        <div class="nav-title">Attention - Vitesse</div>
+        <button class="nav-btn" onclick="loadTest('tmt_a')"><i class="fas fa-route"></i> Trail Making A</button>
+        <button class="nav-btn" onclick="loadTest('tmt_b')"><i class="fas fa-exchange-alt"></i> Trail Making B</button>
+        <button class="nav-btn" onclick="loadTest('reaction')"><i class="fas fa-bolt"></i> Temps Réaction</button>
+        
+        <div class="nav-title">Fonctions Exécutives</div>
+        <button class="nav-btn" onclick="loadTest('stroop')"><i class="fas fa-palette"></i> Stroop (Victoria)</button>
+        <button class="nav-btn" onclick="loadTest('gonogo')"><i class="fas fa-hand-paper"></i> Go / No-Go</button>
+        
+        <div class="nav-title">Mémoire</div>
+        <button class="nav-btn" onclick="loadTest('span_num')"><i class="fas fa-sort-numeric-up"></i> Empan Numérique</button>
+        <button class="nav-btn" onclick="loadTest('corsi')"><i class="fas fa-th"></i> Corsi (Visuel)</button>
+    </nav>
+
+    <!-- MAIN AREA -->
+    <main class="main-content">
+        <div class="test-stage" id="stage">
+            <!-- CONTENT LOADED HERE -->
+        </div>
+    </main>
+</div>
+
+<!-- RESULT MODAL -->
+<div class="modal-overlay" id="resultModal">
+    <div class="result-box">
+        <div class="score-label">Note Standard (M=10)</div>
+        <div class="score-ss" id="resScore">--</div>
+        <div id="resDetails" style="margin-top:0.5rem; font-size:0.9rem; color:var(--muted);"></div>
+        <div class="score-interpretation" id="resInterpret"></div>
+        <button class="btn btn-primary" style="margin-top:1.5rem;" onclick="closeModal()">Enregistrer et Continuer</button>
+    </div>
+</div>
+
+<!-- FINAL REPORT MODAL -->
+<div class="modal-overlay" id="reportModal">
+    <div style="background:var(--surface); padding:2rem; border-radius:16px; width:90%; max-width:800px; max-height:90vh; overflow-y:auto; border:1px solid var(--border);">
+        <h2 style="margin-bottom:1.5rem;"><i class="fas fa-chart-bar" style="color:var(--primary)"></i> Synthèse Neuropsychologique</h2>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:2rem;">
+            <div><canvas id="reportChart"></canvas></div>
+            <div id="reportDetails" style="font-size:0.9rem;"></div>
+        </div>
+        <div style="text-align:right; margin-top:1.5rem;">
+            <button class="btn btn-ghost" onclick="document.getElementById('reportModal').classList.remove('show')">Fermer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- GLOBAL STATE ---
+    const SCORES = {};
+    let globalSeconds = 0;
+    setInterval(() => { globalSeconds++; document.getElementById('globalTimer').innerText = new Date(globalSeconds * 1000).toISOString().substr(14, 5); }, 1000);
+
+    // --- NORMATIVE DATA HELPER (Simulated) ---
+    // SS = Standard Score (Mean 10, SD 3). 7-13 = Normal range.
+    const calc = {
+        rt: (ms) => Math.max(1, Math.min(19, Math.round(18 - (ms/40)))), // faster is better
+        accuracy: (pct) => Math.max(1, Math.min(19, Math.round((pct/5)-2))), 
+        span: (len) => Math.max(1, Math.min(19, 4 + (len * 1.5))),
+        tmt: (sec) => Math.max(1, Math.min(19, Math.round(18 - (sec/5))))
+    };
+
+    const interpret = (ss) => {
+        if(ss >= 13) return {t: "Supérieur", c: "var(--success)"};
+        if(ss >= 8) return {t: "Moyenne", c: "var(--primary)"};
+        if(ss >= 6) return {t: "Limite", c: "var(--accent)"};
+        return {t: "Déficitaire", c: "var(--danger)"};
+    };
+
+    // --- UI CONTROLLERS ---
+    const $ = id => document.getElementById(id);
+    const loadTest = (id) => {
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+        window['init_'+id](); // Call init function
+    };
+    
+    const showResult = (score, details, testKey) => {
+        SCORES[testKey] = score;
+        const i = interpret(score);
+        $('resScore').innerText = score;
+        $('resScore').style.color = i.c;
+        $('resDetails').innerText = details;
+        $('resInterpret').innerHTML = `Interprétation : <strong style="color:${i.c}">${i.t}</strong>`;
+        $('resultModal').classList.add('show');
+    };
+
+    const closeModal = () => $('resultModal').classList.remove('show');
+
+    // --- TEST 1: INTRO ---
+    const init_intro = () => {
+        $('stage').innerHTML = `<div class="card"><div class="card-body" style="text-align:left; max-width:600px;">
+            <h2 style="text-align:center; margin-bottom:1.5rem;">Instructions de Passation</h2>
+            <p>Cette batterie évalue les fonctions attentionnelles, exécutives et mnésiques.</p>
+            <ul style="margin:1rem 0; line-height:1.8; color:#a0aec0;">
+                <li>Le patient doit être installé confortablement.</li>
+                <li>Pas d'aide pendant les tâches.</li>
+                <li>Lire les consignes à voix haute.</li>
+            </ul>
+            <div style="margin-top:2rem; text-align:center;">
+                <button class="btn btn-primary" onclick="loadTest('tmt_a')">Démarrer la batterie</button>
+            </div>
+        </div></div>`;
+    };
+
+    // --- TEST 2: TRAIL MAKING (Interactive Canvas) ---
+    const init_tmt_a = () => init_tmt('A', [1,2,3,4,5,6,7,8]);
+    const init_tmt_b = () => init_tmt('B', [1,'A',2,'B',3,'C',4,'D',5,'E']);
+
+    function init_tmt(type, seq) {
+        const width = 700, height = 450;
+        const nodes = [];
+        // Generate random positions
+        for(let i=0; i<seq.length; i++) {
+            nodes.push({ id: seq[i], x: 50 + Math.random()*(width-100), y: 50 + Math.random()*(height-100), r: 20 });
+        }
+
+        $('stage').innerHTML = `<div class="card">
+            <div class="card-header"><div class="card-title">Trail Making Test - Partie ${type}</div></div>
+            <div class="card-body">
+                <p style="margin-bottom:1rem; color:var(--muted);">Cliquez sur les cercles dans l'ordre : ${seq.join(' → ')}</p>
+                <canvas id="tmtCanvas" width="${width}" height="${height}"></canvas>
+            </div>
+        </div>`;
+
+        const canvas = $('tmtCanvas');
+        const ctx = canvas.getContext('2d');
+        let currentIdx = 0;
+        let startTime = Date.now();
+        let errors = 0;
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+            // Draw lines
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2;
+            // Draw nodes
+            nodes.forEach((n, i) => {
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, n.r, 0, Math.PI*2);
+                ctx.fillStyle = i < currentIdx ? 'rgba(59, 130, 246, 0.2)' : '#1e293b';
+                ctx.fill();
+                ctx.strokeStyle = i === currentIdx ? 'var(--primary)' : '#4a5568';
+                ctx.lineWidth = i === currentIdx ? 3 : 1;
+                ctx.stroke();
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 16px IBM Plex Sans';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(n.id, n.x, n.y);
+            });
+        }
+        draw();
+
+        canvas.onclick = (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Check if clicked current node
+            const target = nodes[currentIdx];
+            const dist = Math.hypot(x - target.x, y - target.y);
+            
+            if(dist < target.r + 10) { // Success
+                currentIdx++;
+                if(currentIdx === nodes.length) {
+                    const time = (Date.now() - startTime) / 1000;
+                    showResult(calc.tmt(time), `Temps: ${time.toFixed(1)}s | Erreurs: ${errors}`, `tmt_${type.toLowerCase()}`);
+                } else {
+                    draw();
+                }
+            } else {
+                // Check if clicked wrong node (optional: for strict error counting)
+                const clickedNode = nodes.find(n => Math.hypot(x-n.x, y-n.y) < n.r+10);
+                if(clickedNode && clickedNode !== target) {
+                    errors++;
+                    // Visual feedback
+                    canvas.style.borderColor = 'var(--danger)';
+                    setTimeout(() => canvas.style.borderColor = 'var(--border)', 200);
+                }
+            }
+        };
+    }
+
+    // --- TEST 3: STROOP (Extended) ---
+    let stroopState;
+    const init_stroop = () => {
+        stroopState = { trial: 0, data: [], start: 0 };
+        $('stage').innerHTML = `<div class="card">
+            <div class="card-header"><div class="card-title">Stroop Victoria</div></div>
+            <div class="card-body" id="stroopBody"><p>Appuyez sur le bouton correspondant à la COULEUR de l'encre.</p><button class="btn btn-primary" onclick="runStroopTrial()">Commencer</button></div>
+        </div>`;
+    };
+
+    function runStroopTrial() {
+        if(stroopState.trial >= 20) return finishStroop();
+        
+        const colors = [{n:'ROUGE', h:'#ef4444'}, {n:'BLEU', h:'#3b82f6'}, {n:'VERT', h:'#10b981'}];
+        const word = colors[Math.floor(Math.random()*3)];
+        const ink = colors[Math.floor(Math.random()*3)];
+        
+        $('stroopBody').innerHTML = `
+            <div class="stimulus-color" style="color:${ink.h}">${word.n}</div>
+            <div style="display:flex; gap:1rem;">
+                ${colors.map(c => `<button class="btn btn-ghost" onclick="checkStroop('${c.n}', '${ink.n}', '${word.n}')">${c.n}</button>`).join('')}
+            </div>
+        `;
+        stroopState.start = performance.now();
+    }
+
+    function checkStroop(clicked, inkColor, writtenWord) {
+        const rt = performance.now() - stroopState.start;
+        const isInterference = inkColor !== writtenWord;
+        const correct = clicked === inkColor;
+        stroopState.data.push({rt, correct, isInterference});
+        stroopState.trial++;
+        runStroopTrial();
+    }
+
+    function finishStroop() {
+        // Calculate interference score (Difference RT Interference - Neutral)
+        let rtInterf = stroopState.data.filter(d => d.isInterference).map(d => d.rt).reduce((a,b)=>a+b,0) / stroopState.data.filter(d=>d.isInterference).length;
+        let rtNeutral = stroopState.data.filter(d => !d.isInterference).map(d => d.rt).reduce((a,b)=>a+b,0) / stroopState.data.filter(d=>!d.isInterference).length;
+        
+        // For demo, we just use average RT
+        let avg = (rtInterf+rtNeutral)/2;
+        showResult(calc.rt(avg), `Interférence: +${Math.round(rtInterf-rtNeutral)}ms`, 'stroop');
+    }
+
+    // --- TEST 4: DIGIT SPAN (Auto-Leveling) ---
+    let spanState;
+    const init_span_num = () => {
+        spanState = { level: 3, dir: 'fwd', trials: 0 };
+        startSpanTrial();
+    };
+
+    function startSpanTrial() {
+        const len = spanState.level;
+        const seq = Array.from({length: len}, () => Math.floor(Math.random()*10));
+        spanState.seq = seq;
+        
+        $('stage').innerHTML = `<div class="card">
+            <div class="card-header"><div class="card-title">Empan Numérique (${spanState.dir === 'fwd' ? 'Endroit' : 'Envers'}) - Niveau ${len}</div></div>
+            <div class="card-body">
+                <div class="stimulus-huge" id="spanDisplay" style="visibility:hidden;">?</div>
+                <button class="btn btn-primary" id="spanBtn" onclick="showSpanSeq()">Voir la séquence</button>
+            </div>
+        </div>`;
+    }
+
+    async function showSpanSeq() {
+        $('spanBtn').style.display = 'none';
+        const disp = $('spanDisplay');
+        disp.style.visibility = 'visible';
+        
+        for(let n of spanState.seq) {
+            disp.innerText = n;
+            await new Promise(r => setTimeout(r, 800));
+            disp.innerText = "";
+            await new Promise(r => setTimeout(r, 200));
+        }
+        
+        disp.style.display = 'none';
+        $('stage').querySelector('.card-body').innerHTML += `
+            <p style="margin-bottom:0.5rem;">Rappel (${spanState.dir === 'fwd' ? 'ordre normal' : 'envers'}) :</p>
+            <input id="spanInput" class="stimulus-huge" style="font-size:2rem; border:1px solid var(--border); padding:0.5rem; text-align:center;" type="text" inputmode="numeric">
+            <button class="btn btn-primary" style="margin-top:1rem;" onclick="checkSpan()">Valider</button>
+        `;
+        $('spanInput').focus();
+    }
+
+    function checkSpan() {
+        const input = $('spanInput').value.split('').map(Number);
+        let target = [...spanState.seq];
+        if(spanState.dir === 'bwd') target.reverse();
+        
+        const correct = input.length === target.length && input.every((v,i) => v===target[i]);
+        
+        if(correct) {
+            spanState.level++;
+            spanState.trials = 0;
+            if(spanState.level > 9) finishSpan(); // Max
+            else startSpanTrial();
+        } else {
+            spanState.trials++;
+            if(spanState.trials >= 2) { // 2 tries allowed
+                if(spanState.dir === 'fwd') {
+                    spanState.dir = 'bwd';
+                    spanState.level = 3; // Reset level for backward
+                    spanState.trials = 0;
+                    startSpanTrial(); // Start backward
+                } else {
+                    finishSpan();
+                }
+            } else {
+                alert("Incorrect, essayez encore.");
+                startSpanTrial();
+            }
+        }
+    }
+
+    function finishSpan() {
+        // In a real test, we would take the highest successful span.
+        // Here we approximate: Fwd score + Bwd score.
+        // Simulated: Level - 1 is the span.
+        showResult(calc.span(spanState.level-1), `Empan max: ${spanState.level-1}`, 'span_num');
+    }
+
+    // --- TEST 5: GO/NO-GO ---
+    let gngState;
+    const init_gonogo = () => {
+        gngState = { total: 0, correct: 0, errors: 0, start: 0, results: [] };
+        $('stage').innerHTML = `<div class="card">
+            <div class="card-header"><div class="card-title">Go / No-Go (Inhibition)</div></div>
+            <div class="card-body">
+                <p>Appuyez sur ESPACE seulement si le carré est <strong style="color:var(--success)">VERT</strong>.</p>
+                <div id="gngBox" class="gng-box"></div>
+                <p id="gngStatus">Appuyez sur une touche pour démarrer...</p>
+            </div>
+        </div>`;
+        
+        document.addEventListener('keydown', handleGNG);
+        document.addEventListener('keyup', handleGNGUp);
+        $('gngBox').onclick = () => handleGNG({type:'click'}); // Touch support
+    };
+
+    function handleGNG(e) {
+        if(gngState.running) {
+            if(e.type === 'keydown' && e.code !== 'Space') return;
+            
+            if(gngState.mode === 'go') {
+                gngState.correct++;
+                gngState.results.push(performance.now() - gngState.start);
+                $('gngBox').style.background = '#fff'; // Flash feedback
+            } else {
+                gngState.errors++; // Commission error
+                $('gngBox').style.background = 'var(--danger)'; 
+            }
+            gngState.running = false; // Disable multiple clicks
+        } else if(!gngState.started) {
+            runGNGTrial();
+        }
+    }
+    
+    function handleGNGUp(e) { if($('gngBox')) $('gngBox').style.background = '#1e293b'; }
+
+    async function runGNGTrial() {
+        gngState.started = true;
+        gngState.total++;
+        if(gngState.total > 20) return finishGNG();
+        
+        await new Promise(r => setTimeout(r, 500 + Math.random()*1000));
+        
+        // 70% Go trials, 30% No-Go
+        const isGo = Math.random() < 0.7;
+        gngState.mode = isGo ? 'go' : 'nogo';
+        gngState.running = true;
+        gngState.start = performance.now();
+        
+        const box = $('gngBox');
+        box.style.background = isGo ? 'var(--success)' : 'var(--danger)';
+        
+        // Timeout if no action
+        setTimeout(() => {
+            if(gngState.running) {
+                if(isGo) gngState.errors++; // Omission error
+                runGNGTrial();
+            }
+        }, 1000);
+    }
+
+    function finishGNG() {
+        document.removeEventListener('keydown', handleGNG);
+        const accuracy = (gngState.correct / 14) * 100; // Approx 14 go trials
+        showResult(calc.accuracy(accuracy), `Erreurs commission: ${gngState.errors}`, 'gonogo');
+    }
+
+    // --- TEST 6: CORSI BLOCKS (Visual Span) ---
+    let corsiState;
+    const init_corsi = () => {
+        corsiState = { seq: [], level: 3, userSeq: [] };
+        $('stage').innerHTML = `<div class="card">
+            <div class="card-header"><div class="card-title">Corsi Block-Tapping</div></div>
+            <div class="card-body">
+                <p>Regardez la séquence, puis reproduisez-la.</p>
+                <div class="corsi-grid" id="corsiGrid" style="pointer-events:none;">
+                    ${Array(9).fill(0).map((_,i) => `<div class="corsi-block" id="cb${i}" onclick="corsiClick(${i})"></div>`).join('')}
+                </div>
+                <button class="btn btn-primary" id="corsiBtn" onclick="startCorsiTrial()" style="margin-top:1rem;">Démarrer Niveau ${corsiState.level}</button>
+            </div>
+        </div>`;
+    };
+
+    async function startCorsiTrial() {
+        $('corsiBtn').style.display = 'none';
+        corsiState.seq = Array.from({length: corsiState.level}, () => Math.floor(Math.random()*9));
+        corsiState.userSeq = [];
+        
+        // Animation
+        for(let idx of corsiState.seq) {
+            await new Promise(r => setTimeout(r, 400));
+            $(`cb${idx}`).classList.add('active');
+            await new Promise(r => setTimeout(r, 400));
+            $(`cb${idx}`).classList.remove('active');
+        }
+        
+        $('corsiGrid').style.pointerEvents = 'auto';
+    }
+
+    function corsiClick(idx) {
+        $(`cb${idx}`).classList.add('active');
+        setTimeout(() => $(`cb${idx}`).classList.remove('active'), 200);
+        
+        corsiState.userSeq.push(idx);
+        
+        // Check progress
+        const i = corsiState.userSeq.length - 1;
+        if(corsiState.userSeq[i] !== corsiState.seq[i]) {
+            // Error
+            showResult(calc.span(corsiState.level - 1), `Empan visuel: ${corsiState.level-1}`, 'corsi');
+            return;
+        }
+
+        if(corsiState.userSeq.length === corsiState.seq.length) {
+            // Success
+            corsiState.level++;
+            $('corsiGrid').style.pointerEvents = 'none';
+            $('corsiBtn').innerText = `Niveau ${corsiState.level}`;
+            $('corsiBtn').style.display = 'block';
+        }
+    }
+
+    // --- FINAL REPORT ---
+    function showFinalReport() {
+        $('reportModal').classList.add('show');
+        const ctx = $('reportChart').getContext('2d');
+        
+        const labels = Object.keys(SCORES);
+        const data = Object.values(SCORES);
+        
+        if(window.repChart) window.repChart.destroy();
+        window.repChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels.map(l => l.toUpperCase()), // TMT_A, STROOP, etc.
+                datasets: [{
+                    label: 'Notes Standard (M=10)',
+                    data: data,
+                    backgroundColor: data.map(d => d < 7 ? 'var(--danger)' : (d < 9 ? 'var(--warning)' : 'var(--primary)')),
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true, max: 19, grid: { color: '#1e293b' } } },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        let html = "";
+        labels.forEach(k => {
+            const s = SCORES[k];
+            const i = interpret(s);
+            html += `<div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding:0.5rem 0;">
+                <span>${k.toUpperCase()}</span>
+                <span style="font-weight:700; color:${i.c}">${s} (${i.t})</span>
+            </div>`;
+        });
+        $('reportDetails').innerHTML = html;
+    }
+
+    // INIT
+    init_intro();
+
+</script>
+</body>
+</html>
